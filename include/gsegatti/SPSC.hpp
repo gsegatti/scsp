@@ -22,26 +22,27 @@ namespace gsegatti
     // SPSC(const SPSC &) = delete;
     // SPSC &operator=(const SPSC &) = delete;
 
-    void push(T &t) noexcept
+    explicit SPSC() {}
+
+    void push(const T &t) noexcept
     {
       size_t nextWriteIdx = (writeIdx_.load(std::memory_order_relaxed) + 1) % queueSize;
       size_t currentReadIdx = readIdx_.load(std::memory_order_acquire);
       while (nextWriteIdx == currentReadIdx)
       {
-        size_t const nextReadIdx = (currentReadIdx + 1) % queueSize;
-        readIdx_.compare_exchange_strong(currentReadIdx, nextReadIdx, std::memory_order_release, std::memory_order_acquire);
+        currentReadIdx = readIdx_.load(std::memory_order_relaxed);
       }
       block[nextWriteIdx] = t;
       writeIdx_.store(nextWriteIdx, std::memory_order_release);
     }
-    void push(T &&t) noexcept
+
+    void push(const T &&t) noexcept
     {
       size_t nextWriteIdx = (writeIdx_.load(std::memory_order_relaxed) + 1) % queueSize;
       size_t currentReadIdx = readIdx_.load(std::memory_order_acquire);
       while (nextWriteIdx == currentReadIdx)
       {
-        size_t const nextReadIdx = (currentReadIdx + 1) % queueSize;
-        readIdx_.compare_exchange_strong(currentReadIdx, nextReadIdx, std::memory_order_release, std::memory_order_acquire);
+        currentReadIdx = readIdx_.load(std::memory_order_relaxed);
       }
       block[nextWriteIdx] = t;
       writeIdx_.store(nextWriteIdx, std::memory_order_release);
@@ -50,12 +51,13 @@ namespace gsegatti
     std::optional<T> pop() noexcept
     {
       size_t const currentReadIdx = readIdx_.load(std::memory_order_relaxed);
-      if(currentReadIdx == writeIdx_.load(std::memory_order_relaxed)){
+      if (currentReadIdx == writeIdx_.load(std::memory_order_relaxed))
+      {
         return std::nullopt;
       }
       size_t nextReadIdx = (currentReadIdx + 1) % queueSize;
       readIdx_.store(nextReadIdx, std::memory_order_release);
-      return {block[nextReadIdx]};
+      return std::optional<T>{std::in_place, block[currentReadIdx]};
     }
 
     [[nodiscard]] bool empty() const noexcept
@@ -64,7 +66,7 @@ namespace gsegatti
              readIdx_.load(std::memory_order_acquire);
     }
 
-    [[nodiscard]] size_t capacity() const noexcept { return queueSize; }
+    [[nodiscard]] constexpr size_t capacity() const noexcept { return queueSize; }
 
   private:
     T block[queueSize];

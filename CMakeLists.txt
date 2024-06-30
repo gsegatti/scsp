@@ -14,14 +14,23 @@ target_include_directories(SPSC INTERFACE
     $<INSTALL_INTERFACE:include>  # This line ensures correct installation paths
 )
 
+# Find and link Boost
+find_package(Boost REQUIRED)
+if (Boost_FOUND)
+    include_directories(${Boost_INCLUDE_DIRS})
+    add_definitions(-DBOOST_ALL_NO_LIB)  # Disable auto-linking (optional)
+endif()
+
 # Create the executable and link SPSC library
 add_executable(Example src/Example.cpp)
+add_executable(Benchmark src/Benchmark.cpp)
 
-# Link the SPSC library to the executable
+# Link the SPSC library to the executables
 find_package(Threads REQUIRED)
 target_link_libraries(Example PRIVATE SPSC Threads::Threads)
+target_link_libraries(Benchmark PRIVATE SPSC Threads::Threads ${Boost_LIBRARIES})
 
-# # Install
+# Install
 # include(GNUInstallDirs)
 # include(CMakePackageConfigHelpers)
 

@@ -11,7 +11,6 @@ int main(int argc, char *argv[])
   SPSC<int, 2> q;
   q.push(1);
   q.push(1);
-  q.push(1);
   auto t = std::thread([&]
     {
       while (!q.empty())
