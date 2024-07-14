@@ -28,7 +28,6 @@ namespace gsegatti
     void push(const T &t) noexcept
     {
       size_t nextWriteIdx = (writeIdx_.load(std::memory_order_relaxed) + 1) % queueSize;
-      // size_t currentReadIdx = readIdx_.load(std::memory_order_acquire);
       while (nextWriteIdx == readIdxCached)
       {
         readIdxCached = readIdx_.load(std::memory_order_relaxed);
@@ -40,16 +39,15 @@ namespace gsegatti
     void push(const T &&t) noexcept
     {
       size_t nextWriteIdx = (writeIdx_.load(std::memory_order_relaxed) + 1) % queueSize;
-      size_t currentReadIdx = readIdx_.load(std::memory_order_acquire);
-      while (nextWriteIdx == currentReadIdx)
+      while (nextWriteIdx == readIdxCached)
       {
-        currentReadIdx = readIdx_.load(std::memory_order_relaxed);
+        readIdxCached = readIdx_.load(std::memory_order_relaxed);
       }
       block[nextWriteIdx] = t;
       writeIdx_.store(nextWriteIdx, std::memory_order_release);
     }
 
-    std::optional<std::reference_wrapper<T>> front() const noexcept
+    [[nodiscard]] std::optional<std::reference_wrapper<T>> front() noexcept
     {
       size_t const currentReadIdx = readIdx_.load(std::memory_order_relaxed);
       if (currentReadIdx == writeIdxCached)
@@ -60,19 +58,20 @@ namespace gsegatti
           return std::nullopt;
         }
       }
-      return std::optional{std::in_place, std::reference_wrapper<T>(std::ref(block[currentReadIdx]))};
+      // To construct a std::optional<T> in place, T would need to be Copy Constructible.
+      // To avoid imposing that over T, we wrap it with std::reference_wrapper which is Copy Constructible.
+      return std::optional<std::reference_wrapper<T>>{std::in_place, std::reference_wrapper<T>(block[currentReadIdx])};
     }
 
-    std::optional<T> pop() noexcept
+    void pop() noexcept
     {
       size_t const currentReadIdx = readIdx_.load(std::memory_order_relaxed);
       if (currentReadIdx == writeIdx_.load(std::memory_order_relaxed))
       {
-        return std::nullopt;
+        return;
       }
       size_t nextReadIdx = (currentReadIdx + 1) % queueSize;
       readIdx_.store(nextReadIdx, std::memory_order_release);
-      return std::optional<T>{std::in_place, block[currentReadIdx]};
     }
 
     [[nodiscard]] bool empty() const noexcept

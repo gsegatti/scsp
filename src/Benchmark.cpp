@@ -39,7 +39,7 @@ int main() {
 //   }
 
   const size_t queueSize = 1048576;
-  const int64_t iters = 1048576;
+  const int64_t iters = 1048576*2;
 
   std::cout << "My SPSCQueue:" << std::endl;
 
@@ -48,6 +48,7 @@ int main() {
     auto t = std::thread([&] {
       pinThread(cpu1);
       for (int i = 0; i < iters; ++i) {
+        auto _ = q.front();
         q.pop();
       }
     });

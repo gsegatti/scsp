@@ -15,7 +15,8 @@ int main(int argc, char *argv[])
     {
       while (!q.empty())
       {
-        auto item = q.pop();
+        auto item = q.front();
+        q.pop();
         std::cout << item.value() << std::endl;
       }
     });
