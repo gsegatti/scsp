@@ -6,6 +6,7 @@
 #include <new> // std::hardware_destructive_interference_size
 #include <atomic>
 #include <optional>
+#include <functional>
 
 template <size_t N>
 concept PowerOfTwo = (N > 1) &&
@@ -48,6 +49,20 @@ namespace gsegatti
       writeIdx_.store(nextWriteIdx, std::memory_order_release);
     }
 
+    std::optional<std::reference_wrapper<T>> front() const noexcept
+    {
+      size_t const currentReadIdx = readIdx_.load(std::memory_order_relaxed);
+      if (currentReadIdx == writeIdxCached)
+      {
+        writeIdxCached = writeIdx_.load(std::memory_order_relaxed);
+        if (currentReadIdx == writeIdxCached)
+        {
+          return std::nullopt;
+        }
+      }
+      return std::optional{std::in_place, std::reference_wrapper<T>(std::ref(block[currentReadIdx]))};
+    }
+
     std::optional<T> pop() noexcept
     {
       size_t const currentReadIdx = readIdx_.load(std::memory_order_relaxed);
@@ -74,6 +89,7 @@ namespace gsegatti
     alignas(cacheLineSize) std::atomic<size_t> writeIdx_ = {0};
     alignas(cacheLineSize) std::atomic<size_t> readIdx_ = {0};
     alignas(cacheLineSize) size_t readIdxCached = 0;
+    alignas(cacheLineSize) size_t writeIdxCached = 0;
   };
 
 }
