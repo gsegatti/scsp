@@ -27,10 +27,10 @@ namespace gsegatti
     void push(const T &t) noexcept
     {
       size_t nextWriteIdx = (writeIdx_.load(std::memory_order_relaxed) + 1) % queueSize;
-      size_t currentReadIdx = readIdx_.load(std::memory_order_acquire);
-      while (nextWriteIdx == currentReadIdx)
+      // size_t currentReadIdx = readIdx_.load(std::memory_order_acquire);
+      while (nextWriteIdx == readIdxCached)
       {
-        currentReadIdx = readIdx_.load(std::memory_order_relaxed);
+        readIdxCached = readIdx_.load(std::memory_order_relaxed);
       }
       block[nextWriteIdx] = t;
       writeIdx_.store(nextWriteIdx, std::memory_order_release);
@@ -73,6 +73,7 @@ namespace gsegatti
     // Reduce False Sharing.
     alignas(cacheLineSize) std::atomic<size_t> writeIdx_ = {0};
     alignas(cacheLineSize) std::atomic<size_t> readIdx_ = {0};
+    alignas(cacheLineSize) size_t readIdxCached = 0;
   };
 
 }
