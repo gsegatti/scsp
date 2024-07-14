@@ -3,64 +3,55 @@
 
 #include <type_traits>
 #include <concepts>
-#include <new> // std::hardware_destructive_interference_size
 #include <atomic>
-#include <optional>
-#include <functional>
 
 template <size_t N>
-concept PowerOfTwo = (N > 1) &&
-                     ((N & (N - 1)) == 0);
+concept PowerOfTwo = ((N & (N - 1)) == 0);
 
 namespace gsegatti
 {
-  template <typename T, size_t queueSize, size_t cacheLineSize = 64>
-    requires PowerOfTwo<queueSize> && PowerOfTwo<cacheLineSize> && std::is_nothrow_copy_assignable_v<T> // covers std::is_nothrow_assignable
+  template <typename T, size_t queueSize, size_t cacheLineAlignment = 64>
+    requires PowerOfTwo<queueSize> && PowerOfTwo<cacheLineAlignment> && std::is_nothrow_copy_assignable_v<T> // covers std::is_nothrow_assignable
   class SPSC
   {
 
   public:
-    // SPSC(const SPSC &) = delete;
-    // SPSC &operator=(const SPSC &) = delete;
-
-    explicit SPSC() {}
-
     void push(const T &t) noexcept
     {
-      size_t nextWriteIdx = (writeIdx_.load(std::memory_order_relaxed) + 1) % queueSize;
-      while (nextWriteIdx == readIdxCached)
+      size_t writeIdx = writeIdx_.load(std::memory_order_relaxed);
+      size_t nextWriteIdx = (writeIdx + 1) % actualSize;
+      while (nextWriteIdx == readIdxCached_)
       {
-        readIdxCached = readIdx_.load(std::memory_order_relaxed);
+        readIdxCached_ = readIdx_.load(std::memory_order_relaxed);
       }
-      block[nextWriteIdx] = t;
+      block[writeIdx] = t;
       writeIdx_.store(nextWriteIdx, std::memory_order_release);
     }
 
     void push(const T &&t) noexcept
     {
-      size_t nextWriteIdx = (writeIdx_.load(std::memory_order_relaxed) + 1) % queueSize;
-      while (nextWriteIdx == readIdxCached)
+      size_t writeIdx = writeIdx_.load(std::memory_order_relaxed);
+      size_t nextWriteIdx = (writeIdx + 1) % actualSize;
+      while (nextWriteIdx == readIdxCached_)
       {
-        readIdxCached = readIdx_.load(std::memory_order_relaxed);
+        readIdxCached_ = readIdx_.load(std::memory_order_relaxed);
       }
-      block[nextWriteIdx] = t;
+      block[writeIdx] = t;
       writeIdx_.store(nextWriteIdx, std::memory_order_release);
     }
 
-    [[nodiscard]] std::optional<std::reference_wrapper<T>> front() noexcept
+    [[nodiscard]] T *front() noexcept
     {
       size_t const currentReadIdx = readIdx_.load(std::memory_order_relaxed);
-      if (currentReadIdx == writeIdxCached)
+      if (currentReadIdx == writeIdxCached_)
       {
-        writeIdxCached = writeIdx_.load(std::memory_order_relaxed);
-        if (currentReadIdx == writeIdxCached)
+        writeIdxCached_ = writeIdx_.load(std::memory_order_relaxed);
+        if (currentReadIdx == writeIdxCached_)
         {
-          return std::nullopt;
+          return nullptr;
         }
       }
-      // To construct a std::optional<T> in place, T would need to be Copy Constructible.
-      // To avoid imposing that over T, we wrap it with std::reference_wrapper which is Copy Constructible.
-      return std::optional<std::reference_wrapper<T>>{std::in_place, std::reference_wrapper<T>(block[currentReadIdx])};
+      return &block[currentReadIdx];
     }
 
     void pop() noexcept
@@ -70,7 +61,7 @@ namespace gsegatti
       {
         return;
       }
-      size_t nextReadIdx = (currentReadIdx + 1) % queueSize;
+      size_t nextReadIdx = (currentReadIdx + 1) % actualSize;
       readIdx_.store(nextReadIdx, std::memory_order_release);
     }
 
@@ -83,17 +74,12 @@ namespace gsegatti
     [[nodiscard]] constexpr size_t capacity() const noexcept { return queueSize; }
 
   private:
-    T block[queueSize];
+    alignas(cacheLineAlignment) static constexpr size_t actualSize = queueSize + 1;
+    alignas(cacheLineAlignment) T block[actualSize];
     // Reduce False Sharing.
-    alignas(cacheLineSize) std::atomic<size_t> writeIdx_ = {0};
-    alignas(cacheLineSize) std::atomic<size_t> readIdx_ = {0};
-    alignas(cacheLineSize) size_t readIdxCached = 0;
-    alignas(cacheLineSize) size_t writeIdxCached = 0;
+    alignas(cacheLineAlignment) std::atomic<size_t> writeIdx_ = {0};
+    alignas(cacheLineAlignment) std::atomic<size_t> readIdx_ = {0};
+    alignas(cacheLineAlignment) size_t readIdxCached_ = 0;
+    alignas(cacheLineAlignment) size_t writeIdxCached_ = 0;
   };
-
 }
-
-// #endif SPSC_HPP
-
-// _ 1 -> 1 1 -> 1    *1->READ
-//              WRITE

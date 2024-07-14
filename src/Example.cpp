@@ -8,17 +8,14 @@ int main(int argc, char *argv[])
 
   using namespace gsegatti;
 
-  SPSC<int, 2> q;
-  q.push(1);
+  SPSC<int, 1> q;
   q.push(1);
   auto t = std::thread([&]
     {
-      while (!q.empty())
-      {
-        auto item = q.front();
-        q.pop();
-        std::cout << item.value() << std::endl;
-      }
+      while (!q.front())
+        ;
+      std::cout << *q.front() << std::endl;
+      q.pop();
     });
 
   t.join();
