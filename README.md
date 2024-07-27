@@ -1,6 +1,6 @@
 # Single Consumer Single Producer Queue
 
-Wait Free and Lock Free queue built on top of a contiguous Ring Buffer using C++ 20.
+Lock Free queue built on top of a contiguous Ring Buffer using C++ 20.
 
 # Interface
 
