@@ -28,6 +28,17 @@ namespace gsegatti
       insert(std::forward<T>(t));
     }
 
+    [[nodiscard]] bool try_push(const T &t) noexcept{
+      return try_insert(t);
+    }
+
+    template<typename TT>
+    requires std::is_nothrow_move_assignable_v<TT>
+    [[nodiscard]] bool try_push(TT &&t) noexcept
+    {
+      return try_insert(std::forward<T>(t));
+    }
+
     [[nodiscard]] T *front() noexcept
     {
       size_t const currentReadIdx = readIdx_.load(std::memory_order_relaxed);
@@ -73,6 +84,22 @@ namespace gsegatti
       }
       block[writeIdx] = std::forward<U>(t);
       writeIdx_.store(nextWriteIdx, std::memory_order_release);
+    }
+
+    template <typename U>
+    bool try_insert(U &&t) noexcept{
+      size_t writeIdx = writeIdx_.load(std::memory_order_relaxed);
+      size_t nextWriteIdx = (writeIdx + 1) % actualSize;
+      if (nextWriteIdx == readIdxCached_)
+      {
+        readIdxCached_ = readIdx_.load(std::memory_order_acquire);
+        if (nextWriteIdx == readIdxCached_){
+          return false;
+        }
+      }
+      block[writeIdx] = std::forward<U>(t);
+      writeIdx_.store(nextWriteIdx, std::memory_order_release);
+      return true;
     }
 
     // Reduce False Sharing via alignas.
