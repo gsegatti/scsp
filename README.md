@@ -12,11 +12,18 @@ Create an `SPSC` queue holding items of type `T` with a fixed `queueSize`. `queu
 
 ### `void push(const T &t) noexcept;`
 
-Enqueue an item using copy assignment. This method blocks if queue is full. Ensure that the queue has space before calling this method.
+Enqueue an item using copy assignment. This method blocks if queue is full.
 
 ### `template<typename TT> void push(TT &&t) noexcept;`
 
 Enqueue an item using move assignment. This method also blocks if queue is full. Requires from that type of object is `std::is_nothrow_move_assignable_v<TT>`.
+
+### `bool try_push(const T &t) noexcept;`
+
+Enqueue an item using copy assignment. This method is non blocking and returns false if queue is full. If push succeeds, returns true.
+### `template<typename TT> bool try_push(TT &&t) noexcept;`
+
+Enqueue an item using move assignment. This method also is non blocking and returns false if queue is full. If push succeeds, returns true. Requires from that type of object is `std::is_nothrow_move_assignable_v<TT>`.
 
 ### `T *front() noexcept;`
 
