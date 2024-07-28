@@ -44,7 +44,7 @@ namespace gsegatti
       size_t const currentReadIdx = readIdx_.load(std::memory_order_relaxed);
       if (currentReadIdx == writeIdxCached_)
       {
-        writeIdxCached_ = writeIdx_.load(std::memory_order_relaxed);
+        writeIdxCached_ = writeIdx_.load(std::memory_order_acquire);
         if (currentReadIdx == writeIdxCached_)
         {
           return nullptr;
@@ -56,7 +56,7 @@ namespace gsegatti
     void pop() noexcept
     {
       size_t const currentReadIdx = readIdx_.load(std::memory_order_relaxed);
-      if (currentReadIdx == writeIdx_.load(std::memory_order_relaxed))
+      if (currentReadIdx == writeIdx_.load(std::memory_order_acquire))
       {
         return;
       }
@@ -74,7 +74,7 @@ namespace gsegatti
 
   private:
     template <typename U>
-    void insert(U &&t)
+    void insert(U &&t) noexcept
     {
       size_t writeIdx = writeIdx_.load(std::memory_order_relaxed);
       size_t nextWriteIdx = (writeIdx + 1) % actualSize;
