@@ -80,7 +80,7 @@ namespace gsegatti
       size_t nextWriteIdx = (writeIdx + 1) % actualSize;
       while (nextWriteIdx == readIdxCached_)
       {
-        readIdxCached_ = readIdx_.load(std::memory_order_relaxed);
+        readIdxCached_ = readIdx_.load(std::memory_order_acquire);
       }
       block[writeIdx] = std::forward<U>(t);
       writeIdx_.store(nextWriteIdx, std::memory_order_release);
